@@ -59,72 +59,29 @@ void mVUsaveReg(const xmm& reg, xAddressVoid ptr, int xyzw, bool modXYZW)
 	return;*/
 
 	switch ( xyzw ) {
-		case 5:		if (x86caps.hasStreamingSIMD4Extensions) {
-						xEXTRACTPS(ptr32[ptr+4], reg, 1);
-						xEXTRACTPS(ptr32[ptr+12], reg, 3);
-					}
-					else {
-						xPSHUF.D(reg, reg, 0xe1); //WZXY
-						xMOVSS(ptr32[ptr+4], reg);
-						xPSHUF.D(reg, reg, 0xff); //WWWW
-						xMOVSS(ptr32[ptr+12], reg);
-					}
+		case 5:		xEXTRACTPS(ptr32[ptr+4], reg, 1);
+					xEXTRACTPS(ptr32[ptr+12], reg, 3);
 					break; // YW
 		case 6:		xPSHUF.D(reg, reg, 0xc9);
 					xMOVL.PS(ptr64[ptr+4], reg);
 					break; // YZ
-		case 7:		if (x86caps.hasStreamingSIMD4Extensions) {
-						xMOVH.PS(ptr64[ptr+8], reg);
-						xEXTRACTPS(ptr32[ptr+4],  reg, 1);
-					}
-					else {
-						xPSHUF.D(reg, reg, 0x93); //ZYXW
-						xMOVH.PS(ptr64[ptr+4], reg);
-						xMOVSS(ptr32[ptr+12], reg);
-					}
+		case 7:		xMOVH.PS(ptr64[ptr+8], reg);
+					xEXTRACTPS(ptr32[ptr+4],  reg, 1);
 					break; // YZW
-		case 9:		if (x86caps.hasStreamingSIMD4Extensions) {
-						xMOVSS(ptr32[ptr], reg);
-						xEXTRACTPS(ptr32[ptr+12], reg, 3);
-					}
-					else {
-						xMOVSS(ptr32[ptr], reg);
-						xPSHUF.D(reg, reg, 0xff); //WWWW
-						xMOVSS(ptr32[ptr+12], reg);
-					}
+		case 9:		xMOVSS(ptr32[ptr], reg);
+					xEXTRACTPS(ptr32[ptr+12], reg, 3);
 					break; // XW
-		case 10:	if (x86caps.hasStreamingSIMD4Extensions) {
-						xMOVSS(ptr32[ptr], reg);
-						xEXTRACTPS(ptr32[ptr+8], reg, 2);
-					}
-					else {
-						xMOVSS(ptr32[ptr], reg);
-						xMOVHL.PS(reg, reg);
-						xMOVSS(ptr32[ptr+8], reg);
-					}
+		case 10:	xMOVSS(ptr32[ptr], reg);
+					xEXTRACTPS(ptr32[ptr+8], reg, 2);
 					break; //XZ
 		case 11:	xMOVSS(ptr32[ptr], reg);
 					xMOVH.PS(ptr64[ptr+8], reg);
 					break; //XZW
-		case 13:	if (x86caps.hasStreamingSIMD4Extensions) {
-						xMOVL.PS(ptr64[ptr], reg);
-						xEXTRACTPS(ptr32[ptr+12], reg, 3);
-					}
-					else {
-						xPSHUF.D(reg, reg, 0x4b); //YXZW				
-						xMOVH.PS(ptr64[ptr], reg);
-						xMOVSS(ptr32[ptr+12], reg);
-					}
+		case 13:	xMOVL.PS(ptr64[ptr], reg);
+					xEXTRACTPS(ptr32[ptr+12], reg, 3);
 					break; // XYW
-		case 14:	if (x86caps.hasStreamingSIMD4Extensions) {
-						xMOVL.PS(ptr64[ptr], reg);
-						xEXTRACTPS(ptr32[ptr+8], reg, 2);
-					}
-					else {
-						xMOVL.PS(ptr64[ptr], reg);
-						xMOVHL.PS(reg, reg);
-						xMOVSS(ptr32[ptr+8], reg);
-					}
+		case 14:	xMOVL.PS(ptr64[ptr], reg);
+					xEXTRACTPS(ptr32[ptr+8], reg, 2);
 					break; // XYZ
 		case 4:		if (!modXYZW) mVUunpack_xyzw(reg, reg, 1);
 					xMOVSS(ptr32[ptr+4], reg);		
@@ -146,8 +103,14 @@ void mVUsaveReg(const xmm& reg, xAddressVoid ptr, int xyzw, bool modXYZW)
 void mVUmergeRegs(const xmm& dest, const xmm& src, int xyzw, bool modXYZW)
 {
 	xyzw &= 0xf;
-	if ( (dest != src) && (xyzw != 0) ) {
-		if (x86caps.hasStreamingSIMD4Extensions && (xyzw != 0x8) && (xyzw != 0xf)) {
+	if ( (dest != src) && (xyzw != 0) ) 
+	{
+		if (xyzw == 0x8)
+			xMOVSS(dest, src);
+		else if (xyzw == 0xf)
+			xMOVAPS(dest, src);
+		else
+		{
 			if (modXYZW) {
 				if		(xyzw == 1) { xINSERTPS(dest, src, _MM_MK_INSERTPS_NDX(0, 3, 0)); return; }
 				else if (xyzw == 2) { xINSERTPS(dest, src, _MM_MK_INSERTPS_NDX(0, 2, 0)); return; }
@@ -155,56 +118,6 @@ void mVUmergeRegs(const xmm& dest, const xmm& src, int xyzw, bool modXYZW)
 			}
 			xyzw = ((xyzw & 1) << 3) | ((xyzw & 2) << 1) | ((xyzw & 4) >> 1) | ((xyzw & 8) >> 3);
 			xBLEND.PS(dest, src, xyzw);
-		}
-		else {
-			switch (xyzw) {
-				case 1:  if (modXYZW) mVUunpack_xyzw(src, src, 0);
-						 xMOVHL.PS(src, dest);		 // src = Sw Sz Dw Dz
-						 xSHUF.PS(dest, src, 0xc4); // 11 00 01 00
-						 break;
-				case 2:  if (modXYZW) mVUunpack_xyzw(src, src, 0);
-						 xMOVHL.PS(src, dest);
-						 xSHUF.PS(dest, src, 0x64);
-						 break;
-				case 3:	 xSHUF.PS(dest, src, 0xe4);
-						 break;
-				case 4:	 if (modXYZW) mVUunpack_xyzw(src, src, 0);
-						 xMOVSS(src, dest);
-						 xMOVSD(dest, src);
-						 break;
-				case 5:	 xSHUF.PS(dest, src, 0xd8);
-						 xPSHUF.D(dest, dest, 0xd8);
-						 break;
-				case 6:	 xSHUF.PS(dest, src, 0x9c);
-						 xPSHUF.D(dest, dest, 0x78);
-						 break;
-				case 7:	 xMOVSS(src, dest);
-						 xMOVAPS(dest, src);
-						 break;
-				case 8:	 xMOVSS(dest, src);
-						 break;
-				case 9:	 xSHUF.PS(dest, src, 0xc9);
-						 xPSHUF.D(dest, dest, 0xd2);
-						 break;
-				case 10: xSHUF.PS(dest, src, 0x8d);
-						 xPSHUF.D(dest, dest, 0x72);
-						 break;
-				case 11: xMOVSS(dest, src);
-						 xSHUF.PS(dest, src, 0xe4);
-						 break;
-				case 12: xMOVSD(dest, src);
-						 break;
-				case 13: xMOVHL.PS(dest, src);
-						 xSHUF.PS(src, dest, 0x64);
-						 xMOVAPS(dest, src);
-						 break;
-				case 14: xMOVHL.PS(dest, src);
-						 xSHUF.PS(src, dest, 0xc4);
-						 xMOVAPS(dest, src);
-						 break;
-				default: xMOVAPS(dest, src);
-						 break;
-			}
 		}
 	} 
 }
@@ -236,6 +149,18 @@ __fi void mVUrestoreRegs(microVU& mVU, bool fromMemory = false) {
 	else xMOVAPS(xmmPQ, ptr128[&mVU.xmmBackup[xmmPQ.Id][0]]);
 }
 
+class mVUScopedXMMBackup {
+	microVU& mVU;
+	bool fromMemory;
+public:
+	mVUScopedXMMBackup(microVU& mVU, bool fromMemory): mVU(mVU), fromMemory(fromMemory) {
+		mVUbackupRegs(mVU, fromMemory);
+	}
+	~mVUScopedXMMBackup() {
+		mVUrestoreRegs(mVU, fromMemory);
+	}
+};
+
 _mVUt void __fc mVUprintRegs() {
 	microVU& mVU = mVUx;
 	for(int i = 0; i < 8; i++) {
@@ -253,6 +178,16 @@ _mVUt void __fc mVUprintRegs() {
 // Gets called by mVUaddrFix at execution-time
 static void __fc mVUwarningRegAccess(u32 prog, u32 pc) {
 	Console.Error("microVU0 Warning: Accessing VU1 Regs! [%04x] [%x]", pc, prog);
+}
+
+static void __fc mVUTBit() {
+	u32 old = vu1Thread.mtvuInterrupts.fetch_or(VU_Thread::InterruptFlagVUTBit, std::memory_order_release);
+	if (old & VU_Thread::InterruptFlagVUTBit)
+		DevCon.Warning("Old TBit not registered");
+}
+
+static void __fc mVUEBit() {
+	u32 old = vu1Thread.mtvuInterrupts.fetch_or(VU_Thread::InterruptFlagVUEBit, std::memory_order_release);
 }
 
 static inline u32 branchAddrN(const mV)
@@ -274,42 +209,31 @@ static void __fc mVUwaitMTVU() {
 }
 
 // Transforms the Address in gprReg to valid VU0/VU1 Address
-__fi void mVUaddrFix(mV, const x32& gprReg)
+__fi void mVUaddrFix(mV, const xAddressReg& gprReg)
 {
 	if (isVU1) {
-		xAND(gprReg, 0x3ff); // wrap around
-		xSHL(gprReg, 4);
+		xAND(xRegister32(gprReg.Id), 0x3ff); // wrap around
+		xSHL(xRegister32(gprReg.Id), 4);
 	}
 	else {
-		xTEST(gprReg, 0x400);
+		xTEST(xRegister32(gprReg.Id), 0x400);
 		xForwardJNZ8 jmpA;		// if addr & 0x4000, reads VU1's VF regs and VI regs
-			xAND(gprReg, 0xff); // if !(addr & 0x4000), wrap around
+			xAND(xRegister32(gprReg.Id), 0xff); // if !(addr & 0x4000), wrap around
 			xForwardJump32 jmpB;
 		jmpA.SetTarget();
 			if (THREAD_VU1) {
-				mVUbackupRegs(mVU, true);
-				xPUSH(gprT1);
-				xPUSH(gprT2);
-				xPUSH(gprT3);
-				// Align the stackframe (GCC only, since GCC assumes stackframe is always aligned)
-#ifdef __GNUC__
-				xSUB(esp, 4);
-#endif
-				if (IsDevBuild && !isCOP2) {         // Lets see which games do this!
-					xMOV(gprT2, mVU.prog.cur->idx); // Note: Kernel does it via COP2 to initialize VU1!
-					xMOV(gprT3, xPC);               // So we don't spam console, we'll only check micro-mode...
-					xCALL((void*)mVUwarningRegAccess);
+				{
+					mVUScopedXMMBackup mVUSave(mVU, true);
+					xScopedSavedRegisters save {gprT1q, gprT2q, gprT3q};
+					if (IsDevBuild && !isCOP2) {         // Lets see which games do this!
+						xMOV(arg1regd, mVU.prog.cur->idx); // Note: Kernel does it via COP2 to initialize VU1!
+						xMOV(arg2regd, xPC);               // So we don't spam console, we'll only check micro-mode...
+						xFastCall((void*)mVUwarningRegAccess, arg1regd, arg2regd);
+					}
+					xFastCall((void*)mVUwaitMTVU);
 				}
-				xCALL((void*)mVUwaitMTVU);
-#ifdef __GNUC__
-				xADD(esp, 4);
-#endif
-				xPOP (gprT3);
-				xPOP (gprT2);
-				xPOP (gprT1);
-				mVUrestoreRegs(mVU, true);
 			}
-			xAND(gprReg, 0x3f); // ToDo: theres a potential problem if VU0 overrides VU1's VF0/VI0 regs!
+			xAND(xRegister32(gprReg.Id), 0x3f); // ToDo: theres a potential problem if VU0 overrides VU1's VF0/VI0 regs!
 			xADD(gprReg, (u128*)VU1.VF - (u128*)VU0.Mem);
 		jmpB.SetTarget();
 		xSHL(gprReg, 4); // multiply by 16 (shift left by 4)
@@ -568,38 +492,38 @@ void mVUcustomSearch() {
 	memset(mVUsearchXMM, 0xcc, __pagesize);
 	xSetPtr(mVUsearchXMM);
 
-	xMOVAPS  (xmm0, ptr32[ecx]);
-	xPCMP.EQD(xmm0, ptr32[edx]);
-	xMOVAPS  (xmm1, ptr32[ecx + 0x10]);
-	xPCMP.EQD(xmm1, ptr32[edx + 0x10]);
+	xMOVAPS  (xmm0, ptr32[arg1reg]);
+	xPCMP.EQD(xmm0, ptr32[arg2reg]);
+	xMOVAPS  (xmm1, ptr32[arg1reg + 0x10]);
+	xPCMP.EQD(xmm1, ptr32[arg2reg + 0x10]);
 	xPAND	 (xmm0, xmm1);
 
 	xMOVMSKPS(eax, xmm0);
 	xCMP	 (eax, 0xf);
 	xForwardJL8 exitPoint;
 
-	xMOVAPS  (xmm0, ptr32[ecx + 0x20]);
-	xPCMP.EQD(xmm0, ptr32[edx + 0x20]);
-	xMOVAPS	 (xmm1, ptr32[ecx + 0x30]);
-	xPCMP.EQD(xmm1, ptr32[edx + 0x30]);
+	xMOVAPS  (xmm0, ptr32[arg1reg + 0x20]);
+	xPCMP.EQD(xmm0, ptr32[arg2reg + 0x20]);
+	xMOVAPS	 (xmm1, ptr32[arg1reg + 0x30]);
+	xPCMP.EQD(xmm1, ptr32[arg2reg + 0x30]);
 	xPAND	 (xmm0, xmm1);
 
-	xMOVAPS  (xmm2, ptr32[ecx + 0x40]);
-	xPCMP.EQD(xmm2, ptr32[edx + 0x40]);
-	xMOVAPS  (xmm3, ptr32[ecx + 0x50]);
-	xPCMP.EQD(xmm3, ptr32[edx + 0x50]);
+	xMOVAPS  (xmm2, ptr32[arg1reg + 0x40]);
+	xPCMP.EQD(xmm2, ptr32[arg2reg + 0x40]);
+	xMOVAPS  (xmm3, ptr32[arg1reg + 0x50]);
+	xPCMP.EQD(xmm3, ptr32[arg2reg + 0x50]);
 	xPAND	 (xmm2, xmm3);
 
-	xMOVAPS	 (xmm4, ptr32[ecx + 0x60]);
-	xPCMP.EQD(xmm4, ptr32[edx + 0x60]);
-	xMOVAPS	 (xmm5, ptr32[ecx + 0x70]);
-	xPCMP.EQD(xmm5, ptr32[edx + 0x70]);
+	xMOVAPS	 (xmm4, ptr32[arg1reg + 0x60]);
+	xPCMP.EQD(xmm4, ptr32[arg2reg + 0x60]);
+	xMOVAPS	 (xmm5, ptr32[arg1reg + 0x70]);
+	xPCMP.EQD(xmm5, ptr32[arg2reg + 0x70]);
 	xPAND	 (xmm4, xmm5);
 
-	xMOVAPS  (xmm6, ptr32[ecx + 0x80]);
-	xPCMP.EQD(xmm6, ptr32[edx + 0x80]);
-	xMOVAPS  (xmm7, ptr32[ecx + 0x90]);
-	xPCMP.EQD(xmm7, ptr32[edx + 0x90]);
+	xMOVAPS  (xmm6, ptr32[arg1reg + 0x80]);
+	xPCMP.EQD(xmm6, ptr32[arg2reg + 0x80]);
+	xMOVAPS  (xmm7, ptr32[arg1reg + 0x90]);
+	xPCMP.EQD(xmm7, ptr32[arg2reg + 0x90]);
 	xPAND	 (xmm6, xmm7);
 
 	xPAND (xmm0, xmm2);

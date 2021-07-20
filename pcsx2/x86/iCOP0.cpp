@@ -117,7 +117,8 @@ void recDI()
 	// Fixes booting issues in the following games:
 	// Jak X, Namco 50th anniversary, Spongebob the Movie, Spongebob Battle for Bikini Bottom,
 	// The Incredibles, The Incredibles rize of the underminer, Soukou kihei armodyne, Garfield Saving Arlene, Tales of Fandom Vol. 2.
-	recompileNextInstruction(0); // DI execution is delayed by one instruction
+	if(!g_recompilingDelaySlot)
+		recompileNextInstruction(0); // DI execution is delayed by one instruction
 
 	xMOV(eax, ptr[&cpuRegs.CP0.n.Status]);
 	xTEST(eax, 0x20006); // EXL | ERL | EDI
@@ -211,7 +212,12 @@ void recMTC0()
 		{
 			case 12:
 				iFlushCall(FLUSH_INTERPRETER);
-				xFastCall((void*)WriteCP0Status, g_cpuConstRegs[_Rt_].UL[0] );
+				xFastCall((void*)WriteCP0Status, g_cpuConstRegs[_Rt_].UL[0]);
+			break;
+
+			case 16:
+				iFlushCall(FLUSH_INTERPRETER);
+				xFastCall((void*)WriteCP0Config, g_cpuConstRegs[_Rt_].UL[0]);
 			break;
 
 			case 9:
@@ -262,6 +268,12 @@ void recMTC0()
 				iFlushCall(FLUSH_INTERPRETER);
 				_eeMoveGPRtoR(ecx, _Rt_);
 				xFastCall((void*)WriteCP0Status, ecx );
+			break;
+
+			case 16:
+				iFlushCall(FLUSH_INTERPRETER);
+				_eeMoveGPRtoR(ecx, _Rt_);
+				xFastCall((void*)WriteCP0Config, ecx);
 			break;
 
 			case 9:
