@@ -757,6 +757,32 @@ struct alignas(16) GSHWDrawConfig
 	GSVector4i colclip_update_area; ///< Area in the framebuffer which colclip will modify;
 };
 
+static inline u32 GetExpansionFactor(GSHWDrawConfig::VSExpand expand)
+{
+	switch (expand)
+	{
+		case GSHWDrawConfig::VSExpand::Point:
+		case GSHWDrawConfig::VSExpand::Line:
+			return 4;
+		case GSHWDrawConfig::VSExpand::Sprite:
+			return 2;
+		default:
+			return 1;
+	}
+}
+
+static inline u32 GetVertexAlignment(GSHWDrawConfig::VSExpand expand)
+{
+	switch (expand)
+	{
+		case GSHWDrawConfig::VSExpand::Sprite:
+			// Sprite expand does a 2-4 expansion, and relies on the low bit of the vertex ID to figure out if it's the first or second coordinate.
+			return 2;
+		default:
+			return 1;
+	}
+}
+
 class GSDevice : public GSAlignedClass<32>
 {
 public:
@@ -866,8 +892,6 @@ protected:
 	bool m_allow_present_throttle = false;
 	u64 m_last_frame_displayed_time = 0;
 
-	GSTexture* m_imgui_font = nullptr;
-
 	GSTexture* m_merge = nullptr;
 	GSTexture* m_weavebob = nullptr;
 	GSTexture* m_blend = nullptr;
@@ -892,6 +916,9 @@ protected:
 
 	/// Applies CAS and writes to the destination texture, which should be a RWTexture.
 	virtual bool DoCAS(GSTexture* sTex, GSTexture* dTex, bool sharpen_only, const std::array<u32, NUM_CAS_CONSTANTS>& constants) = 0;
+
+	/// Perform texture operations for ImGui
+	void UpdateImGuiTextures();
 
 public:
 	GSDevice();
@@ -943,8 +970,8 @@ public:
 	/// Returns true if it's an OpenGL-based renderer.
 	bool UsesLowerLeftOrigin() const;
 
-	/// Recreates the font, call when the window scaling changes.
-	bool UpdateImGuiFontTexture();
+	/// Free ImGui textures before shutdown
+	void DestroyImGuiTextures();
 
 	virtual bool Create(GSVSyncMode vsync_mode, bool allow_present_throttle);
 	virtual void Destroy();

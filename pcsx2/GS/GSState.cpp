@@ -1857,7 +1857,7 @@ void GSState::CheckWriteOverlap(bool req_write, bool req_read)
 	const GSDrawingContext& prev_ctx = m_prev_env.CTXT[m_prev_env.PRIM.CTXT];
 	const GSVector4i write_rect = GSVector4i(m_env.TRXPOS.DSAX, m_env.TRXPOS.DSAY, m_env.TRXPOS.DSAX + w, m_env.TRXPOS.DSAY + h);
 	const u32 write_start_bp = GSLocalMemory::GetStartBlockAddress(blit.DBP, blit.DBW, blit.DPSM, write_rect);
-	const u32 write_end_bp = ((GSLocalMemory::GetEndBlockAddress(blit.DBP, blit.DBW, blit.DPSM, write_rect) + 1) + (BLOCKS_PER_PAGE - 1)) & ~(BLOCKS_PER_PAGE - 1);
+	const u32 write_end_bp = ((GSLocalMemory::GetEndBlockAddress(blit.DBP, blit.DBW, blit.DPSM, write_rect) + 1) + (GS_BLOCKS_PER_PAGE - 1)) & ~(GS_BLOCKS_PER_PAGE - 1);
 	const GSVector4i tex_rect = m_prev_env.PRIM.TME ? GetTEX0Rect() : GSVector4i::zero();
 
 	if (m_index.tail > 0)
@@ -2972,6 +2972,22 @@ bool GSState::TrianglesAreQuads(bool shuffle_check)
 		}
 		else if (m_index.tail == 6)
 		{
+			bool shared_vert_found = false;
+			for (int i = 0; i < 3; i++)
+			{
+				for (int j = 3; j < 6; j++)
+					if (m_vertex.buff[m_index.buff[i]].XYZ.X == m_vertex.buff[m_index.buff[j]].XYZ.X &&
+						m_vertex.buff[m_index.buff[i]].XYZ.Y == m_vertex.buff[m_index.buff[j]].XYZ.Y)
+					{
+						shared_vert_found = true;
+						break;
+					}
+			}
+			
+			// At least one vert should be shared across otherwise it's 2 separate triangles (false positive from Tales of Destiny).
+			if (!shared_vert_found)
+				return false;
+
 			const int first_X = m_vertex.buff[m_index.buff[0]].XYZ.X;
 			const int first_Y = m_vertex.buff[m_index.buff[0]].XYZ.Y;
 			const int second_X = m_vertex.buff[m_index.buff[1]].XYZ.X;
